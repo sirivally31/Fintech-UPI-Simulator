@@ -1,0 +1,31 @@
+stateDiagram-v2
+    [*] --> PENDING: Payee Creates Collect Request (POST /api/payment-requests/)
+    
+    state PENDING {
+        [*] --> AwaitingResponse
+        AwaitingResponse --> ExpiredCheck: 24-Hour Expiration Window
+    }
+
+    PENDING --> ACCEPTED: Payer Approves with Valid PIN (PUT /accept)
+    PENDING --> REJECTED: Payer Declines Request (PUT /reject)
+    PENDING --> CANCELLED: Payee Revokes Request (PUT /cancel)
+    PENDING --> EXPIRED: TTL Exceeded without Response
+
+    state ACCEPTED {
+        [*] --> TriggerTransfer: Execute Automatic TransactionServiceImpl.sendMoney()
+        TriggerTransfer --> RecordLedger: Debit Payer, Credit Payee
+        RecordLedger --> PublishEvent: Emit PaymentRequestAccepted Event
+    }
+
+    state REJECTED {
+        [*] --> EmitRejectEvent: Emit PaymentRequestRejected Event
+    }
+
+    state CANCELLED {
+        [*] --> EmitCancelEvent: Emit PaymentRequestCancelled Event
+    }
+
+    ACCEPTED --> [*]
+    REJECTED --> [*]
+    CANCELLED --> [*]
+    EXPIRED --> [*]

@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor User as Mobile / API Client
+    participant Controller as AuthController
+    participant AuthManager as AuthenticationManager
+    participant UserDetails as CustomUserDetailsService
+    participant Encoder as BCryptPasswordEncoder
+    participant JwtService as JwtService
+    participant DB as PostgreSQL DB
+
+    User->>Controller: POST /api/auth/login {upiId, pin}
+    Controller->>AuthManager: authenticate(UsernamePasswordAuthenticationToken)
+    AuthManager->>UserDetails: loadUserByUsername(upiId)
+    UserDetails->>DB: userRepository.findByUpiId(upiId)
+    DB-->>UserDetails: Return User Entity
+    UserDetails-->>AuthManager: Return UserDetails Principal
+
+    AuthManager->>Encoder: matches(rawPin, encodedPinHash)
+    alt Credentials Invalid
+        Encoder-->>AuthManager: False
+        AuthManager-->>Controller: BadCredentialsException
+        Controller-->>User: 401 Unauthorized {message: "Invalid credentials"}
+    else Credentials Valid
+        Encoder-->>AuthManager: True
+        AuthManager-->>Controller: Authentication Successful
+        Controller->>JwtService: generateToken(UserDetails)
+        JwtService-->>Controller: Return Signed JWT Bearer String
+        Controller-->>User: 200 OK {token: "eyJhbGciOiJIUzI1NiJ9..."}
+    end

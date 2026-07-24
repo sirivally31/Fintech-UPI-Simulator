@@ -1,0 +1,69 @@
+flowchart TB
+    subgraph ClientLayer ["Client & Interface Layer"]
+        MobileApp["Mobile Banking App / Client"]
+        SwaggerUI["Swagger OpenAPI 3 UI"]
+        Postman["Postman / API Clients"]
+    end
+
+    subgraph SecurityLayer ["Security & Ingestion Layer"]
+        Tomcat["Apache Tomcat Port 8080"]
+        SecurityFilter["JwtAuthenticationFilter"]
+        SecurityConfig["Spring Security FilterChain"]
+    end
+
+    subgraph ControllerLayer ["REST Controller Layer"]
+        AuthController["AuthController"]
+        UserController["UserController"]
+        AccountController["BankAccountController"]
+        UpiController["UpiIdController"]
+        TxnController["TransactionController"]
+        PaymentReqController["PaymentRequestController"]
+    end
+
+    subgraph ServiceLayer ["Domain & Business Service Layer"]
+        UserService["UserServiceImpl"]
+        AccountService["BankAccountServiceImpl"]
+        UpiService["UpiIdServiceImpl"]
+        TxnService["TransactionServiceImpl"]
+        PaymentReqService["PaymentRequestServiceImpl"]
+        PinService["UpiPinServiceImpl"]
+        OutboxService["OutboxServiceImpl"]
+        LockService["DistributedLockServiceImpl"]
+        OtpService["OtpCacheServiceImpl"]
+    end
+
+    subgraph DataLayer ["Persistence & Caching Layer"]
+        PostgresDB[("PostgreSQL 15 Database\n(Users, Accounts, VPAs, Ledger)")]
+        RedisCache[("Redis 7 In-Memory Cache\n(Locks, OTPs, Rate Limits)")]
+    end
+
+    subgraph EventLayer ["Asynchronous Event Streaming Layer"]
+        OutboxScheduler["OutboxScheduler (@Scheduled)"]
+        OutboxPublisher["OutboxPublisherServiceImpl"]
+        KafkaBroker["Apache Kafka Broker\n(KRaft Mode)"]
+        KafkaConsumers["Transaction & Payment Consumers"]
+        DLTTopic["Dead Letter Topics (.DLT)"]
+        ReplayService["ReplayServiceImpl"]
+    end
+
+    MobileApp & SwaggerUI & Postman -->|HTTP POST/GET| Tomcat
+    Tomcat --> SecurityFilter
+    SecurityFilter --> SecurityConfig
+    SecurityConfig --> ControllerLayer
+
+    ControllerLayer --> ServiceLayer
+    ServiceLayer -->|BCrypt Matching| PinService
+    ServiceLayer -->|Redisson Locks / OTP| RedisCache
+    ServiceLayer -->|JPA Repositories| PostgresDB
+    ServiceLayer -->|In-Transaction Outbox| OutboxService
+
+    OutboxService -->|Write PENDING Event| PostgresDB
+    OutboxScheduler -->|Poll PENDING Events| PostgresDB
+    OutboxScheduler --> OutboxPublisher
+    OutboxPublisher -->|Publish JSON Record| KafkaBroker
+
+    KafkaBroker --> KafkaConsumers
+    KafkaConsumers -->|Write Processed EventId| PostgresDB
+    KafkaConsumers -.->|Failure & Retries Exhausted| DLTTopic
+    DLTTopic --> ReplayService
+    ReplayService -.->|Re-publish Record| KafkaBroker

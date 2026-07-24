@@ -1,0 +1,54 @@
+graph TB
+    subgraph HostSystem ["Host Operating System Environment"]
+        Port8080["Host Port 8080"]
+        Port8085["Host Port 8085"]
+        Port5432["Host Port 5432"]
+        Port6379["Host Port 6379"]
+        Port9092["Host Port 9092 / 29092"]
+    end
+
+    subgraph DockerNetwork ["Isolated Docker Bridge Network: upi-network"]
+        subgraph AppContainer ["app: upi-simulator-app"]
+            SpringBoot["Spring Boot 3.5.3 Executable JAR\n(Eclipse Temurin JRE 17 Alpine)\nUSER: appuser (Non-root)"]
+            ActuatorHealth["/actuator/health\nReadiness & Liveness Probes"]
+        end
+
+        subgraph PostgresContainer ["postgres: upi-postgres"]
+            PostgreSQL["PostgreSQL 15 Alpine\nHealth Check: pg_isready"]
+        end
+
+        subgraph RedisContainer ["redis: upi-redis"]
+            Redis["Redis 7 Alpine\nHealth Check: redis-cli ping"]
+        end
+
+        subgraph KafkaContainer ["kafka: upi-kafka"]
+            Kafka["Confluent Kafka 7.5.0\nKRaft Mode Broker\nHealth Check: nc -z localhost 9092"]
+        end
+
+        subgraph KafkaUiContainer ["kafka-ui: upi-kafka-ui"]
+            KafkaUI["Provectus Kafka UI\nDashboard"]
+        end
+    end
+
+    subgraph PersistentStorage ["Named Docker Volumes"]
+        VolPostgres[("postgres_data\n(/var/lib/postgresql/data)")]
+        VolKafka[("kafka_data\n(/var/lib/kafka/data)")]
+    end
+
+    Port8080 -->|Forward| AppContainer
+    Port8085 -->|Forward| KafkaUiContainer
+    Port5432 -->|Forward| PostgresContainer
+    Port6379 -->|Forward| RedisContainer
+    Port9092 -->|Forward| KafkaContainer
+
+    SpringBoot -->|jdbc:postgresql://postgres:5432/postgres| PostgreSQL
+    SpringBoot -->|redis:6379| Redis
+    SpringBoot -->|kafka:9092| Kafka
+    KafkaUI -->|kafka:9092| Kafka
+
+    AppContainer -.->|depends_on: condition: service_healthy| PostgresContainer
+    AppContainer -.->|depends_on: condition: service_healthy| RedisContainer
+    AppContainer -.->|depends_on: condition: service_healthy| KafkaContainer
+
+    PostgreSQL --- VolPostgres
+    Kafka --- VolKafka

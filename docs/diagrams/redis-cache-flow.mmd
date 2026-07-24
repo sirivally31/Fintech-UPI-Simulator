@@ -1,0 +1,32 @@
+flowchart TD
+    subgraph ClientRequests ["Incoming API Requests"]
+        ReqOTP["Request OTP / Reg"]
+        ReqLock["Execute Financial Transfer"]
+        ReqApi["Invoke API Endpoints"]
+    end
+
+    subgraph ServiceSubsystems ["Spring Service Layer"]
+        OtpSvc["OtpCacheServiceImpl"]
+        LockSvc["DistributedLockServiceImpl"]
+        RateSvc["RateLimiterServiceImpl"]
+    end
+
+    subgraph RedisStore ["Redis 7 In-Memory Server"]
+        OtpKeys[("Key: OTP:<phoneNumber>\nTTL: 5 Minutes (300s)")]
+        LockKeys[("Key: LOCK:ACCOUNT:<id>\nTTL: 10s Lease (Redisson)")]
+        RateKeys[("Key: RATELIMIT:<client>:<uri>\nTTL: 60s Window")]
+    end
+
+    ReqOTP --> OtpSvc
+    OtpSvc -->|Save OTP with TTL| OtpKeys
+    OtpSvc -->|Validate & Invalidate| OtpKeys
+
+    ReqLock --> LockSvc
+    LockSvc -->|SET NX PX (Acquire Mutex)| LockKeys
+    LockSvc -->|DEL Key (Release Mutex)| LockKeys
+
+    ReqApi --> RateSvc
+    RateSvc -->|INCR Counter & EXPIRE| RateKeys
+    RateKeys -->|Counter > Limit?| Throttled{Exceeded?}
+    Throttled -- Yes --> Throw429[Throw RateLimitExceededException\nHTTP 429 Too Many Requests]
+    Throttled -- No --> Proceed[Proceed Request Execution]

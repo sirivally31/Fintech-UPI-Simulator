@@ -1,0 +1,39 @@
+flowchart LR
+    subgraph PublisherNode ["Producer Node"]
+        OutboxTable[("outbox_events Table\n(status = PENDING)")]
+        Scheduler["OutboxScheduler\n(@Scheduled 5s)"]
+        OutboxPub["OutboxPublisherServiceImpl"]
+    end
+
+    subgraph KafkaCluster ["Apache Kafka Cluster"]
+        MainTopic{Topic:\ntransaction-completed-events}
+        RetryTopic{Topic:\ntransaction-completed-events-retry}
+        DLTTopic{Topic:\ntransaction-completed-events-dlt}
+    end
+
+    subgraph ConsumerNode ["Consumer Node"]
+        Consumer["TransactionEventConsumer\n(Group: upi-simulator-group)"]
+        IdempotencyCheck{"Check DB:\nprocessed_events"}
+        Skip[Skip Duplicate Processing]
+        ExecuteConsumer["Execute Downstream Action\n(Audit / Notification)"]
+        ProcessedTable[("processed_events Table")]
+    end
+
+    subgraph AdminReplay ["Resilience Operations"]
+        ReplaySvc["ReplayServiceImpl"]
+    end
+
+    OutboxTable -->|Poll Pending Records| Scheduler
+    Scheduler --> OutboxPub
+    OutboxPub -->|KafkaTemplate.send()| MainTopic
+
+    MainTopic -->|Consume Message| Consumer
+    Consumer --> IdempotencyCheck
+    IdempotencyCheck -- EventId Exists --> Skip
+    IdempotencyCheck -- EventId New --> ExecuteConsumer
+    ExecuteConsumer --> ProcessedTable
+
+    Consumer -.->|Exception Thrown| RetryTopic
+    RetryTopic -.->|3 Retries Exhausted| DLTTopic
+    DLTTopic --> ReplaySvc
+    ReplaySvc -.->|Manual Trigger Replay| MainTopic

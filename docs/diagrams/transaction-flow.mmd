@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor Payer as Payer Client
+    participant Filter as JwtAuthenticationFilter
+    participant TxnCtrl as TransactionController
+    participant TxnSvc as TransactionServiceImpl
+    participant PinSvc as UpiPinServiceImpl
+    participant LockSvc as DistributedLockServiceImpl
+    participant DB as PostgreSQL DB
+    participant Outbox as OutboxServiceImpl
+
+    Payer->>Filter: POST /api/transactions/send (Header: Bearer <jwt>)
+    Filter-->>TxnCtrl: Authenticated User Principal Set
+    TxnCtrl->>TxnSvc: sendMoney(SendMoneyRequest)
+
+    TxnSvc->>DB: findByIdAndUser(senderAccountId, currentUserId)
+    TxnSvc->>DB: findByUpiId(receiverUpiId)
+
+    TxnSvc->>LockSvc: acquireLock("LOCK:ACCOUNT:" + senderAccountId)
+    LockSvc-->>TxnSvc: Lock Acquired
+
+    TxnSvc->>PinSvc: verifyUpiPin(senderAccount, rawPin)
+    PinSvc->>PinSvc: BCrypt.matches(rawPin, account.upiPin)
+    PinSvc-->>TxnSvc: PIN Valid (True)
+
+    TxnSvc->>TxnSvc: Validate Balance >= Amount & Generate UTR
+
+    rect rgb(240, 248, 255)
+        note over TxnSvc, Outbox: Atomic Spring @Transactional Boundary
+        TxnSvc->>DB: UPDATE bank_accounts SET balance = balance - amount (Sender)
+        TxnSvc->>DB: UPDATE bank_accounts SET balance = balance + amount (Receiver)
+        TxnSvc->>DB: INSERT INTO transactions (UTR, Status: SUCCESS)
+        TxnSvc->>Outbox: saveOutboxEvent(TransactionCompletedEvent)
+        Outbox->>DB: INSERT INTO outbox_events (Status: PENDING)
+    end
+
+    TxnSvc->>LockSvc: releaseLock("LOCK:ACCOUNT:" + senderAccountId)
+    TxnSvc-->>TxnCtrl: TransactionResponse DTO
+    TxnCtrl-->>Payer: 200 OK (UTR, Amount, Status: SUCCESS)
