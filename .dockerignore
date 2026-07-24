@@ -1,0 +1,39 @@
+# Build outputs and targets
+target/
+build/
+*.jar
+*.war
+*.ear
+
+# Version control
+.git/
+.gitignore
+
+# IDEs & Editors
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Node.js and Frontend dependencies
+node_modules/
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+temp/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Documentation & Misc
+HELP.md
+README drafts
