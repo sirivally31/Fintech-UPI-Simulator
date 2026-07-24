@@ -2,11 +2,15 @@ package com.example.demo.service.impl;
 
 import com.example.demo.dto.*;
 import com.example.demo.entity.*;
+import com.example.demo.events.*;
 import com.example.demo.repository.PaymentRequestRepository;
 import com.example.demo.repository.UpiIdRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.service.OutboxService;
 import com.example.demo.service.PaymentRequestService;
 import com.example.demo.service.TransactionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,24 +18,30 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class PaymentRequestServiceImpl implements PaymentRequestService {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentRequestServiceImpl.class);
+
     private final PaymentRequestRepository paymentRequestRepository;
     private final UpiIdRepository upiIdRepository;
     private final UserRepository userRepository;
     private final TransactionService transactionService;
+    private final OutboxService outboxService;
 
     public PaymentRequestServiceImpl(PaymentRequestRepository paymentRequestRepository,
                                      UpiIdRepository upiIdRepository,
                                      UserRepository userRepository,
-                                     TransactionService transactionService) {
+                                     TransactionService transactionService,
+                                     OutboxService outboxService) {
         this.paymentRequestRepository = paymentRequestRepository;
         this.upiIdRepository = upiIdRepository;
         this.userRepository = userRepository;
         this.transactionService = transactionService;
+        this.outboxService = outboxService;
     }
 
     private User getCurrentUser() {
@@ -119,6 +129,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setStatus(PaymentRequestStatus.PENDING);
 
         req = paymentRequestRepository.save(req);
+        publishCreatedEvent(req);
         return mapToResponse(req);
     }
 
@@ -159,11 +170,12 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         sendReq.setRemarks("Payment for Request: " + req.getRequestReference());
         sendReq.setUpiPin(request.getUpiPin());
 
-        transactionService.sendMoney(sendReq);
+        TransactionResponse txnResp = transactionService.sendMoney(sendReq);
 
         req.setStatus(PaymentRequestStatus.ACCEPTED);
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
+        publishAcceptedEvent(req, txnResp != null ? txnResp.getTransactionReference() : null);
         
         return mapToResponse(req);
     }
@@ -181,6 +193,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setStatus(PaymentRequestStatus.REJECTED);
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
+        publishRejectedEvent(req);
 
         return mapToResponse(req);
     }
@@ -202,6 +215,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setStatus(PaymentRequestStatus.CANCELLED);
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
+        publishCancelledEvent(req);
 
         return mapToResponse(req);
     }
@@ -220,5 +234,105 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         }
 
         return mapToResponse(req);
+    }
+
+    private void publishCreatedEvent(PaymentRequest req) {
+        String correlationId = UUID.randomUUID().toString();
+        PaymentRequestCreatedEvent event = PaymentRequestCreatedEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventTime(LocalDateTime.now())
+                .eventType("PaymentRequestCreated")
+                .correlationId(correlationId)
+                .requestReference(req.getRequestReference())
+                .senderUpiId(req.getSenderUpiId().getUpiId())
+                .receiverUpiId(req.getReceiverUpiId().getUpiId())
+                .amount(req.getAmount())
+                .note(req.getNote())
+                .status(req.getStatus().name())
+                .expiresAt(req.getExpiresAt())
+                .build();
+
+        outboxService.saveOutboxEvent(
+                event.getEventId(),
+                "PAYMENT_REQUEST",
+                req.getId(),
+                "PAYMENT_REQUEST_CREATED",
+                correlationId,
+                event
+        );
+    }
+
+    private void publishAcceptedEvent(PaymentRequest req, String transactionRef) {
+        String correlationId = UUID.randomUUID().toString();
+        PaymentRequestAcceptedEvent event = PaymentRequestAcceptedEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventTime(LocalDateTime.now())
+                .eventType("PaymentRequestAccepted")
+                .correlationId(correlationId)
+                .requestReference(req.getRequestReference())
+                .senderUpiId(req.getSenderUpiId().getUpiId())
+                .receiverUpiId(req.getReceiverUpiId().getUpiId())
+                .amount(req.getAmount())
+                .respondedAt(req.getRespondedAt())
+                .transactionReference(transactionRef)
+                .build();
+
+        outboxService.saveOutboxEvent(
+                event.getEventId(),
+                "PAYMENT_REQUEST",
+                req.getId(),
+                "PAYMENT_REQUEST_ACCEPTED",
+                correlationId,
+                event
+        );
+    }
+
+    private void publishRejectedEvent(PaymentRequest req) {
+        String correlationId = UUID.randomUUID().toString();
+        PaymentRequestRejectedEvent event = PaymentRequestRejectedEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventTime(LocalDateTime.now())
+                .eventType("PaymentRequestRejected")
+                .correlationId(correlationId)
+                .requestReference(req.getRequestReference())
+                .senderUpiId(req.getSenderUpiId().getUpiId())
+                .receiverUpiId(req.getReceiverUpiId().getUpiId())
+                .amount(req.getAmount())
+                .respondedAt(req.getRespondedAt())
+                .reason("Rejected by payer")
+                .build();
+
+        outboxService.saveOutboxEvent(
+                event.getEventId(),
+                "PAYMENT_REQUEST",
+                req.getId(),
+                "PAYMENT_REQUEST_REJECTED",
+                correlationId,
+                event
+        );
+    }
+
+    private void publishCancelledEvent(PaymentRequest req) {
+        String correlationId = UUID.randomUUID().toString();
+        PaymentRequestCancelledEvent event = PaymentRequestCancelledEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventTime(LocalDateTime.now())
+                .eventType("PaymentRequestCancelled")
+                .correlationId(correlationId)
+                .requestReference(req.getRequestReference())
+                .senderUpiId(req.getSenderUpiId().getUpiId())
+                .receiverUpiId(req.getReceiverUpiId().getUpiId())
+                .amount(req.getAmount())
+                .cancelledAt(req.getRespondedAt())
+                .build();
+
+        outboxService.saveOutboxEvent(
+                event.getEventId(),
+                "PAYMENT_REQUEST",
+                req.getId(),
+                "PAYMENT_REQUEST_CANCELLED",
+                correlationId,
+                event
+        );
     }
 }

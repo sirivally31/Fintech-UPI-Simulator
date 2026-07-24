@@ -20,6 +20,10 @@ import com.example.demo.repository.BankAccountRepository;
 import com.example.demo.repository.TransactionRepository;
 import com.example.demo.repository.UpiIdRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.events.TransactionCompletedEvent;
+import com.example.demo.service.OutboxService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,62 +32,64 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Implementation of the TransactionService.
- * 
- * <h3>Architecture & Design Comments</h3>
- * 
- * <p><b>Separation of Concerns:</b></p>
- * <p>By placing business rules (like checking sufficient balance, verifying UPI PINs, and validating statuses) 
- * here in the Service layer, we ensure our Controllers remain thin (only handling HTTP routing) and our Repositories 
- * remain simple (only handling database queries). This makes the code highly modular and testable.</p>
- * 
- * <p><b>Constructor Injection:</b></p>
- * <p>Using constructor injection ensures this service cannot be instantiated without all its required dependencies. 
- * It promotes immutability (fields can be 'final') and makes unit testing straightforward since we can pass mocks directly.</p>
- * 
- * <p><b>SecurityContextHolder:</b></p>
- * <p>We retrieve the currently logged-in user dynamically from the SecurityContextHolder. This prevents users from 
- * passing arbitrary user IDs in the request, mitigating IDOR (Insecure Direct Object Reference) vulnerabilities.</p>
- * 
- * <p><b>Helper Methods:</b></p>
- * <p>Private helper methods (like getOwnedBankAccount) centralize repetitive validation logic (like ownership checks), 
- * keeping the public methods focused on their primary business flow.</p>
- * 
- * <p><b>DTO Mapping:</b></p>
- * <p>Entities are converted into Response DTOs before returning. We never expose internal entities to the API, 
- * ensuring sensitive data like User passwords and UPI PINs are never accidentally serialized and leaked.</p>
- * 
- * <p><b>Why BigDecimal is mandatory:</b></p>
- * <p>Floating-point types lose precision during arithmetic. BigDecimal ensures exact decimal representation, 
- * preventing catastrophic rounding errors in financial balances.</p>
- * 
- * <p><b>ACID properties, Atomic transactions & Why @Transactional prevents money loss:</b></p>
- * <p>A money transfer requires debiting one account and crediting another. If the application crashes halfway through, 
- * money could be debited but never credited. @Transactional guarantees Atomicity (all or nothing) and Consistency 
- * (ACID properties). If any step fails, the entire transaction rolls back automatically.</p>
  */
 @Service
 public class TransactionServiceImpl implements TransactionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionServiceImpl.class);
 
     private final TransactionRepository transactionRepository;
     private final BankAccountRepository bankAccountRepository;
     private final UpiIdRepository upiIdRepository;
     private final UserRepository userRepository;
     private final UpiPinService upiPinService;
+    private final OutboxService outboxService;
 
     public TransactionServiceImpl(TransactionRepository transactionRepository,
                                   BankAccountRepository bankAccountRepository,
                                   UpiIdRepository upiIdRepository,
                                   UserRepository userRepository,
-                                  UpiPinService upiPinService) {
+                                  UpiPinService upiPinService,
+                                  OutboxService outboxService) {
         this.transactionRepository = transactionRepository;
         this.bankAccountRepository = bankAccountRepository;
         this.upiIdRepository = upiIdRepository;
         this.userRepository = userRepository;
         this.upiPinService = upiPinService;
+        this.outboxService = outboxService;
+    }
+
+    private TransactionCompletedEvent buildTransactionCompletedEvent(Transaction transaction, String correlationId) {
+        return TransactionCompletedEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventTime(LocalDateTime.now())
+                .eventType("TransactionCompleted")
+                .correlationId(correlationId)
+                .transactionReference(transaction.getTransactionReference())
+                .senderUpiId(transaction.getSenderUpiId().getUpiId())
+                .receiverUpiId(transaction.getReceiverUpiId().getUpiId())
+                .amount(transaction.getAmount())
+                .status(transaction.getStatus().name())
+                .remarks(transaction.getRemarks())
+                .build();
+    }
+
+    private void publishTransactionEvent(Transaction transaction) {
+        String correlationId = UUID.randomUUID().toString();
+        TransactionCompletedEvent event = buildTransactionCompletedEvent(transaction, correlationId);
+        outboxService.saveOutboxEvent(
+                event.getEventId(),
+                "TRANSACTION",
+                transaction.getId(),
+                "TRANSACTION_COMPLETED",
+                correlationId,
+                event
+        );
     }
 
     private User getCurrentUser() {
@@ -218,6 +224,9 @@ public class TransactionServiceImpl implements TransactionService {
         
         // 19: Save transaction
         transaction = transactionRepository.save(transaction);
+
+        // Publish event to Kafka after successful database commit
+        publishTransactionEvent(transaction);
 
         // 20: Return TransactionResponse
         return convertToTransactionResponse(transaction);
