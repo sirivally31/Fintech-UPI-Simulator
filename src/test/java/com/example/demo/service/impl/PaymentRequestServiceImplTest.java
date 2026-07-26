@@ -51,6 +51,9 @@ class PaymentRequestServiceImplTest {
     @Mock
     private OutboxService outboxService;
 
+    @Mock
+    private com.example.demo.metrics.BusinessMetricsService businessMetricsService;
+
     @InjectMocks
     private PaymentRequestServiceImpl paymentRequestService;
 

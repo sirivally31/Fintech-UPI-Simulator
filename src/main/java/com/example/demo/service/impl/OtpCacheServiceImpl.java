@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of OtpCacheService managing 6-digit numeric OTP generation,
  * 5-minute Redis expiration, and single-use verification logic.
@@ -22,9 +24,12 @@ public class OtpCacheServiceImpl implements OtpCacheService {
 
     private final RedisCacheService redisCacheService;
     private final SecureRandom secureRandom;
+    private final BusinessMetricsService businessMetricsService;
 
-    public OtpCacheServiceImpl(RedisCacheService redisCacheService) {
+    public OtpCacheServiceImpl(RedisCacheService redisCacheService,
+                               BusinessMetricsService businessMetricsService) {
         this.redisCacheService = redisCacheService;
+        this.businessMetricsService = businessMetricsService;
         this.secureRandom = new SecureRandom();
     }
 
@@ -36,6 +41,7 @@ public class OtpCacheServiceImpl implements OtpCacheService {
 
         redisCacheService.save(redisKey, otpStr, OTP_TTL_MINUTES, TimeUnit.MINUTES);
         log.info("OTP Generated | identifier: [{}] | ttl: [{} minutes]", identifier, OTP_TTL_MINUTES);
+        businessMetricsService.recordOtpGenerated();
 
         return otpStr;
     }
@@ -48,10 +54,12 @@ public class OtpCacheServiceImpl implements OtpCacheService {
         if (storedOtp != null && storedOtp.equals(inputOtp)) {
             redisCacheService.delete(redisKey); // One-time use: delete immediately upon verification
             log.info("OTP Verified | identifier: [{}] | status: [SUCCESS]", identifier);
+            businessMetricsService.recordOtpVerified();
             return true;
         }
 
         log.warn("OTP Verified | identifier: [{}] | status: [FAILED]", identifier);
+        businessMetricsService.recordOtpFailed();
         return false;
     }
 }

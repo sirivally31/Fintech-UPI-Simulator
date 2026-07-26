@@ -221,15 +221,25 @@ http://localhost:8080/swagger-ui/index.html
 
 ---
 
-# ❤️ Health Monitoring
+# ❤️ Health & Observability Monitoring
 
-Spring Boot Actuator is configured.
+Spring Boot Actuator, Micrometer, Prometheus, and Grafana are integrated for enterprise operational visibility.
 
-Health Endpoint
+Endpoints:
+- **Actuator Health:** `http://localhost:8080/actuator/health`
+- **Prometheus Metrics Stream:** `http://localhost:8080/actuator/prometheus`
+- **Prometheus Engine UI:** `http://localhost:9090`
+- **Grafana Enterprise Dashboards:** `http://localhost:3000` (Default Login: `admin` / `admin`)
 
-```
-http://localhost:8080/actuator/health
-```
+### Enterprise Dashboards & Observability
+Grafana auto-provisions Prometheus datasources and visualizes:
+- **JVM & Memory:** Heap usage, live thread count, CPU utilization, GC pauses.
+- **HTTP Latency:** P95/P99 latency distribution histograms, status code breakdown.
+- **Business KPIs:** Real-time transaction success rate, payment amount volume, collect requests, rate limit blocks.
+- **Messaging & Cache:** Kafka producer/consumer rate, Redis cache hit/miss ratio, HikariCP connection pool metrics.
+
+*Dashboard Screenshots Placeholder:*
+`![Grafana Executive Dashboard](docs/images/grafana-dashboard-placeholder.png)`
 
 ---
 

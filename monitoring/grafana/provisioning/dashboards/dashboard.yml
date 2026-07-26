@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'UPI Simulator Dashboards'
+    orgId: 1
+    folder: 'UPI Simulator'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

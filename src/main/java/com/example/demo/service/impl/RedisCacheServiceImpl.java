@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of RedisCacheService wrapping RedisTemplate operations with structured SLF4J logging.
  */
@@ -19,10 +21,14 @@ public class RedisCacheServiceImpl implements RedisCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final BusinessMetricsService businessMetricsService;
 
-    public RedisCacheServiceImpl(RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
+    public RedisCacheServiceImpl(RedisTemplate<String, Object> redisTemplate,
+                                 ObjectMapper objectMapper,
+                                 BusinessMetricsService businessMetricsService) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.businessMetricsService = businessMetricsService;
     }
 
     @Override
@@ -42,12 +48,14 @@ public class RedisCacheServiceImpl implements RedisCacheService {
             Object obj = redisTemplate.opsForValue().get(key);
             if (obj != null) {
                 log.info("Cache HIT | key: [{}]", key);
+                businessMetricsService.recordRedisCacheHit(key);
                 if (clazz.isInstance(obj)) {
                     return (T) obj;
                 }
                 return objectMapper.convertValue(obj, clazz);
             } else {
                 log.info("Cache MISS | key: [{}]", key);
+                businessMetricsService.recordRedisCacheMiss(key);
                 return null;
             }
         } catch (Exception e) {

@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 @Service
 public class PaymentRequestServiceImpl implements PaymentRequestService {
 
@@ -31,17 +33,20 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
     private final UserRepository userRepository;
     private final TransactionService transactionService;
     private final OutboxService outboxService;
+    private final BusinessMetricsService businessMetricsService;
 
     public PaymentRequestServiceImpl(PaymentRequestRepository paymentRequestRepository,
                                      UpiIdRepository upiIdRepository,
                                      UserRepository userRepository,
                                      TransactionService transactionService,
-                                     OutboxService outboxService) {
+                                     OutboxService outboxService,
+                                     BusinessMetricsService businessMetricsService) {
         this.paymentRequestRepository = paymentRequestRepository;
         this.upiIdRepository = upiIdRepository;
         this.userRepository = userRepository;
         this.transactionService = transactionService;
         this.outboxService = outboxService;
+        this.businessMetricsService = businessMetricsService;
     }
 
     private User getCurrentUser() {
@@ -130,6 +135,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
 
         req = paymentRequestRepository.save(req);
         publishCreatedEvent(req);
+        businessMetricsService.recordPaymentRequestCreated();
         return mapToResponse(req);
     }
 
@@ -176,6 +182,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
         publishAcceptedEvent(req, txnResp != null ? txnResp.getTransactionReference() : null);
+        businessMetricsService.recordPaymentRequestAccepted();
         
         return mapToResponse(req);
     }
@@ -194,6 +201,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
         publishRejectedEvent(req);
+        businessMetricsService.recordPaymentRequestRejected();
 
         return mapToResponse(req);
     }
@@ -216,6 +224,7 @@ public class PaymentRequestServiceImpl implements PaymentRequestService {
         req.setRespondedAt(LocalDateTime.now());
         req = paymentRequestRepository.save(req);
         publishCancelledEvent(req);
+        businessMetricsService.recordPaymentRequestCancelled();
 
         return mapToResponse(req);
     }

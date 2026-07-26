@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of the TransactionService.
  */
@@ -49,19 +51,22 @@ public class TransactionServiceImpl implements TransactionService {
     private final UserRepository userRepository;
     private final UpiPinService upiPinService;
     private final OutboxService outboxService;
+    private final BusinessMetricsService businessMetricsService;
 
     public TransactionServiceImpl(TransactionRepository transactionRepository,
                                   BankAccountRepository bankAccountRepository,
                                   UpiIdRepository upiIdRepository,
                                   UserRepository userRepository,
                                   UpiPinService upiPinService,
-                                  OutboxService outboxService) {
+                                  OutboxService outboxService,
+                                  BusinessMetricsService businessMetricsService) {
         this.transactionRepository = transactionRepository;
         this.bankAccountRepository = bankAccountRepository;
         this.upiIdRepository = upiIdRepository;
         this.userRepository = userRepository;
         this.upiPinService = upiPinService;
         this.outboxService = outboxService;
+        this.businessMetricsService = businessMetricsService;
     }
 
     private TransactionCompletedEvent buildTransactionCompletedEvent(Transaction transaction, String correlationId) {
@@ -142,94 +147,105 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional
     public TransactionResponse sendMoney(SendMoneyRequest request) {
-        // 1 & 2: Validate authenticated user and sender account ownership
-        BankAccount senderAccount = getOwnedBankAccount(request.getSenderBankAccountId());
+        long startTime = System.currentTimeMillis();
+        try {
+            // 1 & 2: Validate authenticated user and sender account ownership
+            BankAccount senderAccount = getOwnedBankAccount(request.getSenderBankAccountId());
 
-        // 3 & 4: Find receiver UPI ID and ensure it exists
-        UpiId receiverUpi = upiIdRepository.findByUpiId(request.getReceiverUpiId())
-                .orElseThrow(() -> new IllegalArgumentException("Receiver UPI ID not found"));
+            // 3 & 4: Find receiver UPI ID and ensure it exists
+            UpiId receiverUpi = upiIdRepository.findByUpiId(request.getReceiverUpiId())
+                    .orElseThrow(() -> new IllegalArgumentException("Receiver UPI ID not found"));
 
-        BankAccount receiverAccount = receiverUpi.getBankAccount();
+            BankAccount receiverAccount = receiverUpi.getBankAccount();
 
-        // 5: Receiver UPI status must be ACTIVE
-        if (receiverUpi.getStatus() != UpiStatus.ACTIVE) {
-            throw new IllegalStateException("Receiver UPI ID is not active");
+            // 5: Receiver UPI status must be ACTIVE
+            if (receiverUpi.getStatus() != UpiStatus.ACTIVE) {
+                throw new IllegalStateException("Receiver UPI ID is not active");
+            }
+
+            // 6: Sender account status must be ACTIVE
+            if (senderAccount.getStatus() != AccountStatus.ACTIVE) {
+                throw new IllegalStateException("Sender bank account is not active");
+            }
+
+            // 7: Receiver account status must be ACTIVE
+            if (receiverAccount.getStatus() != AccountStatus.ACTIVE) {
+                throw new IllegalStateException("Receiver bank account is not active");
+            }
+
+            // 8: Prevent self-transfer
+            if (senderAccount.getId().equals(receiverAccount.getId())) {
+                throw new IllegalArgumentException("Cannot transfer money to the same bank account");
+            }
+
+            // 9: Verify UPI PIN securely via upiPinService
+            VerifyUpiPinRequest verifyReq = new VerifyUpiPinRequest();
+            verifyReq.setBankAccountId(senderAccount.getId());
+            verifyReq.setPin(request.getUpiPin());
+            
+            if (!upiPinService.verifyUpiPin(verifyReq)) {
+                throw new SecurityException("Invalid UPI PIN");
+            }
+
+            // 10: Amount must be greater than zero
+            if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Transfer amount must be greater than zero");
+            }
+
+            // 11: Sender balance must be sufficient
+            if (senderAccount.getBalance().compareTo(request.getAmount()) < 0) {
+                throw new IllegalStateException("Insufficient balance");
+            }
+
+            // 12: Generate unique transaction reference
+            String txnRef = generateTransactionReference();
+
+            // 13: Debit sender account
+            senderAccount.setBalance(senderAccount.getBalance().subtract(request.getAmount()));
+
+            // 14: Credit receiver account
+            receiverAccount.setBalance(receiverAccount.getBalance().add(request.getAmount()));
+
+            // 15: Create Transaction entity
+            Transaction transaction = new Transaction();
+            
+            // 16: Set fields
+            transaction.setTransactionReference(txnRef);
+            transaction.setSenderBankAccount(senderAccount);
+            transaction.setReceiverBankAccount(receiverAccount);
+            
+            // Find sender's primary UPI ID to attach to the record
+            UpiId senderUpi = upiIdRepository.findByBankAccountAndIsPrimaryTrue(senderAccount)
+                    .orElseGet(() -> upiIdRepository.findByBankAccount(senderAccount).stream().findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Sender has no linked UPI ID")));
+
+            transaction.setSenderUpiId(senderUpi);
+            transaction.setReceiverUpiId(receiverUpi);
+            transaction.setAmount(request.getAmount());
+            transaction.setRemarks(request.getRemarks());
+            transaction.setStatus(TransactionStatus.SUCCESS);
+
+            // 17 & 18: Save accounts
+            bankAccountRepository.save(senderAccount);
+            bankAccountRepository.save(receiverAccount);
+            
+            // 19: Save transaction
+            transaction = transactionRepository.save(transaction);
+
+            // Publish event to Kafka after successful database commit
+            publishTransactionEvent(transaction);
+
+            // Enterprise Business Metrics Recording
+            businessMetricsService.recordTransactionSuccess("DIRECT_TRANSFER");
+            businessMetricsService.recordTransactionAmount(transaction.getAmount().doubleValue(), "DIRECT_TRANSFER");
+            businessMetricsService.recordTransactionProcessingTime(System.currentTimeMillis() - startTime, "DIRECT_TRANSFER");
+
+            // 20: Return TransactionResponse
+            return convertToTransactionResponse(transaction);
+        } catch (Exception ex) {
+            businessMetricsService.recordTransactionFailure("DIRECT_TRANSFER", ex.getClass().getSimpleName());
+            throw ex;
         }
-
-        // 6: Sender account status must be ACTIVE
-        if (senderAccount.getStatus() != AccountStatus.ACTIVE) {
-            throw new IllegalStateException("Sender bank account is not active");
-        }
-
-        // 7: Receiver account status must be ACTIVE
-        if (receiverAccount.getStatus() != AccountStatus.ACTIVE) {
-            throw new IllegalStateException("Receiver bank account is not active");
-        }
-
-        // 8: Prevent self-transfer
-        if (senderAccount.getId().equals(receiverAccount.getId())) {
-            throw new IllegalArgumentException("Cannot transfer money to the same bank account");
-        }
-
-        // 9: Verify UPI PIN securely via upiPinService
-        VerifyUpiPinRequest verifyReq = new VerifyUpiPinRequest();
-        verifyReq.setBankAccountId(senderAccount.getId());
-        verifyReq.setPin(request.getUpiPin());
-        
-        if (!upiPinService.verifyUpiPin(verifyReq)) {
-            throw new SecurityException("Invalid UPI PIN");
-        }
-
-        // 10: Amount must be greater than zero
-        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Transfer amount must be greater than zero");
-        }
-
-        // 11: Sender balance must be sufficient
-        if (senderAccount.getBalance().compareTo(request.getAmount()) < 0) {
-            throw new IllegalStateException("Insufficient balance");
-        }
-
-        // 12: Generate unique transaction reference
-        String txnRef = generateTransactionReference();
-
-        // 13: Debit sender account
-        senderAccount.setBalance(senderAccount.getBalance().subtract(request.getAmount()));
-
-        // 14: Credit receiver account
-        receiverAccount.setBalance(receiverAccount.getBalance().add(request.getAmount()));
-
-        // 15: Create Transaction entity
-        Transaction transaction = new Transaction();
-        
-        // 16: Set fields
-        transaction.setTransactionReference(txnRef);
-        transaction.setSenderBankAccount(senderAccount);
-        transaction.setReceiverBankAccount(receiverAccount);
-        
-        // Find sender's primary UPI ID to attach to the record
-        UpiId senderUpi = upiIdRepository.findByBankAccountAndIsPrimaryTrue(senderAccount)
-                .orElseGet(() -> upiIdRepository.findByBankAccount(senderAccount).stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Sender has no linked UPI ID")));
-
-        transaction.setSenderUpiId(senderUpi);
-        transaction.setReceiverUpiId(receiverUpi);
-        transaction.setAmount(request.getAmount());
-        transaction.setRemarks(request.getRemarks());
-        transaction.setStatus(TransactionStatus.SUCCESS);
-
-        // 17 & 18: Save accounts
-        bankAccountRepository.save(senderAccount);
-        bankAccountRepository.save(receiverAccount);
-        
-        // 19: Save transaction
-        transaction = transactionRepository.save(transaction);
-
-        // Publish event to Kafka after successful database commit
-        publishTransactionEvent(transaction);
-
-        // 20: Return TransactionResponse
-        return convertToTransactionResponse(transaction);
     }
 
     @Override

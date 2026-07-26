@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication APIs", description = "Endpoints for user login and JWT token generation")
@@ -25,10 +27,14 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final BusinessMetricsService businessMetricsService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtService jwtService) {
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtService jwtService,
+                          BusinessMetricsService businessMetricsService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.businessMetricsService = businessMetricsService;
     }
 
     @Operation(summary = "Login to the simulator", description = "Authenticates a user using UPI ID and PIN. Returns a JWT Bearer token on success.")
@@ -39,13 +45,19 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUpiId(), request.getPin())
-        );
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUpiId(), request.getPin())
+            );
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String jwtToken = jwtService.generateToken(userDetails);
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String jwtToken = jwtService.generateToken(userDetails);
 
-        return ResponseEntity.ok(new LoginResponseDto(jwtToken));
+            businessMetricsService.recordAuthenticationSuccess();
+            return ResponseEntity.ok(new LoginResponseDto(jwtToken));
+        } catch (Exception ex) {
+            businessMetricsService.recordAuthenticationFailure(ex.getClass().getSimpleName());
+            throw ex;
+        }
     }
 }

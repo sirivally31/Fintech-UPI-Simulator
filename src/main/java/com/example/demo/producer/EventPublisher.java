@@ -17,4 +17,28 @@ public interface EventPublisher {
     void publishPaymentRequestRejected(PaymentRequestRejectedEvent event);
 
     void publishPaymentRequestCancelled(PaymentRequestCancelledEvent event);
+
+    void publishQrCreated(QrCreatedEvent event);
+
+    void publishQrPaymentSuccess(QrPaymentSuccessEvent event);
+
+    void publishBeneficiaryAdded(BeneficiaryAddedEvent event);
+
+    void publishBeneficiaryUpdated(BeneficiaryUpdatedEvent event);
+
+    void publishBeneficiaryDeleted(BeneficiaryDeletedEvent event);
+
+    void publishAutoPayCreated(AutoPayCreatedEvent event);
+
+    void publishAutoPayExecuted(AutoPayExecutedEvent event);
+
+    void publishAutoPayFailed(AutoPayFailedEvent event);
+
+    void publishAutoPayCancelled(AutoPayCancelledEvent event);
+
+    void publishFraudDetected(FraudDetectedEvent event);
+
+    void publishFraudBlocked(FraudBlockedEvent event);
+
+    void publishHighRiskTransaction(HighRiskTransactionEvent event);
 }

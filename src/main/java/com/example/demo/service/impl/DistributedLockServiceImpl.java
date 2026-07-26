@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of DistributedLockService using Redis atomic SETNX (setIfAbsent)
  * operations to prevent concurrent duplicate payment execution.
@@ -19,9 +21,12 @@ public class DistributedLockServiceImpl implements DistributedLockService {
     private static final String LOCK_PREFIX = "lock:transaction:";
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final BusinessMetricsService businessMetricsService;
 
-    public DistributedLockServiceImpl(RedisTemplate<String, Object> redisTemplate) {
+    public DistributedLockServiceImpl(RedisTemplate<String, Object> redisTemplate,
+                                      BusinessMetricsService businessMetricsService) {
         this.redisTemplate = redisTemplate;
+        this.businessMetricsService = businessMetricsService;
     }
 
     @Override
@@ -33,13 +38,16 @@ public class DistributedLockServiceImpl implements DistributedLockService {
 
             if (Boolean.TRUE.equals(acquired)) {
                 log.info("Lock Acquired | lockKey: [{}] | lockValue: [{}] | ttl: [{}s]", fullKey, lockValue, expireSeconds);
+                businessMetricsService.recordRedisLockAcquired(lockKey);
                 return true;
             } else {
                 log.warn("Lock Acquisition Failed | lockKey: [{}] | lockValue: [{}]", fullKey, lockValue);
+                businessMetricsService.recordRedisLockFailed(lockKey);
                 return false;
             }
         } catch (Exception e) {
             log.error("Lock Acquisition ERROR | lockKey: [{}]", fullKey, e);
+            businessMetricsService.recordRedisLockFailed(lockKey);
             return false;
         }
     }

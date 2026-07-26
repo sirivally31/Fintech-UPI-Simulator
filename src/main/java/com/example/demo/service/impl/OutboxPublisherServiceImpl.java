@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of OutboxPublisherService for processing pending outbox events,
  * publishing them to Kafka, and updating outbox status and retry telemetry.
@@ -27,13 +29,16 @@ public class OutboxPublisherServiceImpl implements OutboxPublisherService {
     private final OutboxEventRepository outboxEventRepository;
     private final TopicResolver topicResolver;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final BusinessMetricsService businessMetricsService;
 
     public OutboxPublisherServiceImpl(OutboxEventRepository outboxEventRepository,
                                       TopicResolver topicResolver,
-                                      KafkaTemplate<String, Object> kafkaTemplate) {
+                                      KafkaTemplate<String, Object> kafkaTemplate,
+                                      BusinessMetricsService businessMetricsService) {
         this.outboxEventRepository = outboxEventRepository;
         this.topicResolver = topicResolver;
         this.kafkaTemplate = kafkaTemplate;
+        this.businessMetricsService = businessMetricsService;
     }
 
     @Override
@@ -85,6 +90,7 @@ public class OutboxPublisherServiceImpl implements OutboxPublisherService {
         event.setStatus(OutboxStatus.PUBLISHED);
         event.setPublishedAt(LocalDateTime.now());
         outboxEventRepository.save(event);
+        businessMetricsService.recordOutboxPublished(event.getEventType());
 
         log.info("Outbox Publishing SUCCESS | eventId: [{}] | aggregateId: [{}] | aggregateType: [{}] | " +
                         "eventType: [{}] | status: [{}] | retryCount: [{}] | correlationId: [{}] | publishedAt: [{}]",
@@ -108,6 +114,7 @@ public class OutboxPublisherServiceImpl implements OutboxPublisherService {
         }
 
         outboxEventRepository.save(event);
+        businessMetricsService.recordOutboxFailed(event.getEventType(), ex.getMessage());
 
         log.error("Outbox Publishing ERROR | eventId: [{}] | aggregateId: [{}] | aggregateType: [{}] | " +
                         "eventType: [{}] | status: [{}] | retryCount: [{}]/[{}] | correlationId: [{}]",

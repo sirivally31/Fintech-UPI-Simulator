@@ -52,6 +52,61 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex.getMessage(), HttpStatus.FORBIDDEN, request);
     }
 
+    @ExceptionHandler(MerchantNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleMerchantNotFound(MerchantNotFoundException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(MerchantAlreadyExistsException.class)
+    public ResponseEntity<ApiErrorResponse> handleMerchantAlreadyExists(MerchantAlreadyExistsException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT, request);
+    }
+
+    @ExceptionHandler(InvalidQrException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidQr(InvalidQrException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(PaymentProcessingException.class)
+    public ResponseEntity<ApiErrorResponse> handlePaymentProcessing(PaymentProcessingException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(BeneficiaryNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleBeneficiaryNotFound(BeneficiaryNotFoundException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(BeneficiaryAlreadyExistsException.class)
+    public ResponseEntity<ApiErrorResponse> handleBeneficiaryAlreadyExists(BeneficiaryAlreadyExistsException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT, request);
+    }
+
+    @ExceptionHandler(BeneficiaryValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleBeneficiaryValidation(BeneficiaryValidationException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(AutoPayNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleAutoPayNotFound(AutoPayNotFoundException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(AutoPayValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAutoPayValidation(AutoPayValidationException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(FraudRuleNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleFraudRuleNotFound(FraudRuleNotFoundException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(FraudDetectedException.class)
+    public ResponseEntity<ApiErrorResponse> handleFraudDetected(FraudDetectedException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.FORBIDDEN, request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
         String errorMessage = ex.getBindingResult().getFieldErrors().stream()

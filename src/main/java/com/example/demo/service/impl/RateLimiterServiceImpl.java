@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+import com.example.demo.metrics.BusinessMetricsService;
+
 /**
  * Implementation of RateLimiterService using Redis atomic counters and sliding window expirations.
  */
@@ -19,9 +21,12 @@ public class RateLimiterServiceImpl implements RateLimiterService {
     private static final String RATE_LIMIT_PREFIX = "ratelimit:";
 
     private final RedisCacheService redisCacheService;
+    private final BusinessMetricsService businessMetricsService;
 
-    public RateLimiterServiceImpl(RedisCacheService redisCacheService) {
+    public RateLimiterServiceImpl(RedisCacheService redisCacheService,
+                                  BusinessMetricsService businessMetricsService) {
         this.redisCacheService = redisCacheService;
+        this.businessMetricsService = businessMetricsService;
     }
 
     @Override
@@ -37,10 +42,13 @@ public class RateLimiterServiceImpl implements RateLimiterService {
         if (currentCount != null && currentCount > maxRequests) {
             log.warn("Rate Limit Exceeded | identifier: [{}] | action: [{}] | currentCount: [{}] | limit: [{}]",
                     identifier, action, currentCount, maxRequests);
+            businessMetricsService.recordRateLimitBlocked(action);
             throw new RateLimitExceededException(
                     String.format("Rate limit exceeded for action [%s]. Allowed: %d requests per %d seconds.",
                             action, maxRequests, windowSeconds)
             );
         }
+
+        businessMetricsService.recordRateLimitAllowed(action);
     }
 }
