@@ -107,6 +107,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex.getMessage(), HttpStatus.FORBIDDEN, request);
     }
 
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotificationNotFound(NotificationNotFoundException ex, WebRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
         String errorMessage = ex.getBindingResult().getFieldErrors().stream()

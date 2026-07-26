@@ -94,4 +94,44 @@ public class NotificationEventConsumer {
             throw e; // Rethrow exception so Spring Kafka retry and DLT mechanisms are triggered
         }
     }
+
+    @KafkaListener(
+            topics = KafkaTopics.QR_PAYMENT_SUCCESS,
+            groupId = "${spring.kafka.consumer.group-id:upi-simulator-group}"
+    )
+    public void consumeQrPaymentSuccess(com.example.demo.events.QrPaymentSuccessEvent event) {
+        if (event == null || idempotencyService.isEventProcessed(event.getEventId())) return;
+        log.info("Received QrPaymentSuccessEvent from topic [{}] | reference: [{}]", KafkaTopics.QR_PAYMENT_SUCCESS, event.getTransactionReference());
+        idempotencyService.markEventProcessed(event.getEventId(), event.getEventType(), event.getCorrelationId());
+    }
+
+    @KafkaListener(
+            topics = KafkaTopics.AUTOPAY_EXECUTED,
+            groupId = "${spring.kafka.consumer.group-id:upi-simulator-group}"
+    )
+    public void consumeAutoPayExecuted(com.example.demo.events.AutoPayExecutedEvent event) {
+        if (event == null || idempotencyService.isEventProcessed(event.getEventId())) return;
+        log.info("Received AutoPayExecutedEvent from topic [{}] | mandate: [{}]", KafkaTopics.AUTOPAY_EXECUTED, event.getMandateReference());
+        idempotencyService.markEventProcessed(event.getEventId(), event.getEventType(), event.getCorrelationId());
+    }
+
+    @KafkaListener(
+            topics = KafkaTopics.FRAUD_DETECTED,
+            groupId = "${spring.kafka.consumer.group-id:upi-simulator-group}"
+    )
+    public void consumeFraudDetected(com.example.demo.events.FraudDetectedEvent event) {
+        if (event == null || idempotencyService.isEventProcessed(event.getEventId())) return;
+        log.warn("Received FraudDetectedEvent from topic [{}] | payer: [{}] | score: [{}]", KafkaTopics.FRAUD_DETECTED, event.getPayerUpiId(), event.getRiskScore());
+        idempotencyService.markEventProcessed(event.getEventId(), event.getEventType(), event.getCorrelationId());
+    }
+
+    @KafkaListener(
+            topics = KafkaTopics.BENEFICIARY_ADDED,
+            groupId = "${spring.kafka.consumer.group-id:upi-simulator-group}"
+    )
+    public void consumeBeneficiaryAdded(com.example.demo.events.BeneficiaryAddedEvent event) {
+        if (event == null || idempotencyService.isEventProcessed(event.getEventId())) return;
+        log.info("Received BeneficiaryAddedEvent from topic [{}] | beneficiary: [{}]", KafkaTopics.BENEFICIARY_ADDED, event.getBeneficiaryUpiId());
+        idempotencyService.markEventProcessed(event.getEventId(), event.getEventType(), event.getCorrelationId());
+    }
 }
