@@ -115,6 +115,26 @@ public class KafkaEventPublisher implements EventPublisher {
         sendEvent(KafkaTopics.HIGH_RISK_TRANSACTION, event.getPayerUpiId(), event.getCorrelationId(), event);
     }
 
+    @Override
+    public void publishSettlementCompleted(SettlementCompletedEvent event) {
+        sendEvent(KafkaTopics.SETTLEMENT_COMPLETED, event.getBatchReference(), event.getCorrelationId(), event);
+    }
+
+    @Override
+    public void publishSettlementFailed(SettlementFailedEvent event) {
+        sendEvent(KafkaTopics.SETTLEMENT_FAILED, event.getBatchReference(), event.getCorrelationId(), event);
+    }
+
+    @Override
+    public void publishSettlementReconciled(SettlementReconciledEvent event) {
+        sendEvent(KafkaTopics.SETTLEMENT_RECONCILED, event.getCorrelationId(), event.getCorrelationId(), event);
+    }
+
+    @Override
+    public void publishSettlementReversed(SettlementReversedEvent event) {
+        sendEvent(KafkaTopics.SETTLEMENT_REVERSED, event.getBatchReference(), event.getCorrelationId(), event);
+    }
+
     /**
      * Private helper method to handle event publishing, asynchronous callbacks, and structured logging.
      *

@@ -41,4 +41,12 @@ public interface EventPublisher {
     void publishFraudBlocked(FraudBlockedEvent event);
 
     void publishHighRiskTransaction(HighRiskTransactionEvent event);
+
+    void publishSettlementCompleted(SettlementCompletedEvent event);
+
+    void publishSettlementFailed(SettlementFailedEvent event);
+
+    void publishSettlementReconciled(SettlementReconciledEvent event);
+
+    void publishSettlementReversed(SettlementReversedEvent event);
 }

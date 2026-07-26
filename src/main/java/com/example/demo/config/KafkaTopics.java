@@ -27,4 +27,8 @@ public final class KafkaTopics {
     public static final String FRAUD_DETECTED = "upi.fraud.detected";
     public static final String FRAUD_BLOCKED = "upi.fraud.blocked";
     public static final String HIGH_RISK_TRANSACTION = "upi.fraud.high-risk";
+    public static final String SETTLEMENT_COMPLETED = "upi.settlement.completed";
+    public static final String SETTLEMENT_FAILED = "upi.settlement.failed";
+    public static final String SETTLEMENT_RECONCILED = "upi.settlement.reconciled";
+    public static final String SETTLEMENT_REVERSED = "upi.settlement.reversed";
 }
