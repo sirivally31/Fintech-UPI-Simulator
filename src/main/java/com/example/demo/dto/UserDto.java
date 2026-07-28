@@ -1,13 +1,30 @@
 package com.example.demo.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 
+@Schema(description = "User profile details response DTO")
 public class UserDto {
 
+    @Schema(description = "Unique internal database user ID", example = "1")
+    @JsonProperty("id")
     private Long id;
+
+    @Schema(description = "Full legal name of the user", example = "John Doe")
+    @JsonProperty("name")
     private String name;
+
+    @Schema(description = "Registered 10-digit mobile phone number", example = "9876543210")
+    @JsonProperty("phoneNumber")
     private String phoneNumber;
+
+    @Schema(description = "Primary Virtual Payment Address / UPI ID", example = "john@upi")
+    @JsonProperty("upiId")
     private String upiId;
+
+    @Schema(description = "Current main wallet/account balance", example = "50000.00")
+    @JsonProperty("balance")
     private BigDecimal balance;
 
     public UserDto() {
