@@ -135,6 +135,11 @@ public class KafkaEventPublisher implements EventPublisher {
         sendEvent(KafkaTopics.SETTLEMENT_REVERSED, event.getBatchReference(), event.getCorrelationId(), event);
     }
 
+    @Override
+    public void publishAuditCreated(AuditCreatedEvent event) {
+        sendEvent(KafkaTopics.AUDIT_CREATED, event.getEventId(), event.getCorrelationId(), event);
+    }
+
     /**
      * Private helper method to handle event publishing, asynchronous callbacks, and structured logging.
      *

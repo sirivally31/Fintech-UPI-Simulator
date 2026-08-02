@@ -11,7 +11,6 @@ import com.example.demo.repository.UserRepository;
 import com.example.demo.service.AdminDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -94,56 +94,62 @@ public class AdminDashboardController {
     @Operation(summary = "Get All System Transactions", description = "Retrieves complete transaction log history for operations audit.")
     @ApiResponse(responseCode = "200", description = "Transactions retrieved successfully")
     @GetMapping("/transactions")
-    public ResponseEntity<List<Transaction>> getAllTransactions() {
-        List<Transaction> txns = transactionRepository.findAll();
+    public ResponseEntity<List<TransactionResponse>> getAllTransactions() {
+        List<TransactionResponse> txns = transactionRepository.findAll().stream()
+                .map(this::mapToTransactionResponse)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(txns);
     }
 
     @Operation(summary = "Search Transactions", description = "Searches transactions with multi-field filtering.")
     @ApiResponse(responseCode = "200", description = "Matching transactions retrieved successfully")
     @GetMapping("/transactions/search")
-    public ResponseEntity<List<Transaction>> searchTransactions(
+    public ResponseEntity<List<TransactionResponse>> searchTransactions(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) String upiId,
             @RequestParam(required = false) String reference) {
-        List<Transaction> txns = adminDashboardService.searchTransactions(status, minAmount, upiId, reference);
+        List<TransactionResponse> txns = adminDashboardService.searchTransactions(status, minAmount, upiId, reference);
         return ResponseEntity.ok(txns);
     }
 
     @Operation(summary = "Get All Users", description = "Retrieves all registered users.")
     @ApiResponse(responseCode = "200", description = "Users retrieved successfully")
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userRepository.findAll();
+    public ResponseEntity<List<UserDto>> getAllUsers() {
+        List<UserDto> users = userRepository.findAll().stream()
+                .map(this::mapToUserDto)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
 
     @Operation(summary = "Update User Status", description = "Admin action to disable, enable, lock, or unlock a user profile.")
     @ApiResponse(responseCode = "200", description = "User status updated successfully")
     @PatchMapping("/users/{id}/status")
-    public ResponseEntity<User> updateUserStatus(
+    public ResponseEntity<UserDto> updateUserStatus(
             @Parameter(description = "User ID", required = true) @PathVariable Long id,
             @RequestParam String action) {
-        User updated = adminDashboardService.updateUserStatus(id, action);
+        UserDto updated = adminDashboardService.updateUserStatus(id, action);
         return ResponseEntity.ok(updated);
     }
 
     @Operation(summary = "Get All Merchants", description = "Retrieves all registered merchant profiles.")
     @ApiResponse(responseCode = "200", description = "Merchants retrieved successfully")
     @GetMapping("/merchants")
-    public ResponseEntity<List<Merchant>> getAllMerchants() {
-        List<Merchant> merchants = merchantRepository.findAll();
+    public ResponseEntity<List<MerchantResponse>> getAllMerchants() {
+        List<MerchantResponse> merchants = merchantRepository.findAll().stream()
+                .map(this::mapToMerchantResponse)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(merchants);
     }
 
     @Operation(summary = "Update Merchant Status", description = "Admin action to approve, reject, suspend, or reactivate a merchant.")
     @ApiResponse(responseCode = "200", description = "Merchant status updated successfully")
     @PatchMapping("/merchants/{id}/status")
-    public ResponseEntity<Merchant> updateMerchantStatus(
+    public ResponseEntity<MerchantResponse> updateMerchantStatus(
             @Parameter(description = "Merchant ID", required = true) @PathVariable Long id,
             @RequestParam String action) {
-        Merchant updated = adminDashboardService.updateMerchantStatus(id, action);
+        MerchantResponse updated = adminDashboardService.updateMerchantStatus(id, action);
         return ResponseEntity.ok(updated);
     }
 
@@ -154,5 +160,41 @@ public class AdminDashboardController {
             @Parameter(description = "Notification UUID", required = true) @PathVariable UUID id) {
         adminDashboardService.resendNotification(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private TransactionResponse mapToTransactionResponse(Transaction t) {
+        TransactionResponse dto = new TransactionResponse();
+        dto.setTransactionReference(t.getTransactionReference());
+        dto.setSenderUpiId(t.getSenderUpiId() != null ? t.getSenderUpiId().getUpiId() : null);
+        dto.setReceiverUpiId(t.getReceiverUpiId() != null ? t.getReceiverUpiId().getUpiId() : null);
+        dto.setAmount(t.getAmount());
+        dto.setRemarks(t.getRemarks());
+        dto.setStatus(t.getStatus());
+        dto.setCreatedAt(t.getCreatedAt());
+        return dto;
+    }
+
+    private UserDto mapToUserDto(User u) {
+        return new UserDto(
+                u.getId(),
+                u.getName(),
+                u.getPhoneNumber(),
+                u.getUpiId(),
+                u.getBalance()
+        );
+    }
+
+    private MerchantResponse mapToMerchantResponse(Merchant m) {
+        if (m == null) return null;
+        return new MerchantResponse(
+                m.getId(),
+                m.getMerchantName(),
+                m.getBusinessName(),
+                m.getMerchantCode(),
+                m.getUpiId(),
+                m.getCategory(),
+                m.getActive(),
+                m.getCreatedAt()
+        );
     }
 }

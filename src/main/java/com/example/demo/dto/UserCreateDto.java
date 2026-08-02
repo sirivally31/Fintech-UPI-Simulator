@@ -1,6 +1,7 @@
 package com.example.demo.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -19,11 +20,13 @@ public class UserCreateDto {
     @Pattern(regexp = "^\\d{10}$", message = "Phone number must be 10 digits")
     @Schema(description = "10-digit mobile phone number", example = "9876543210")
     @JsonProperty("phoneNumber")
+    @JsonAlias({"phone_number", "phone"})
     private String phoneNumber;
 
     @NotBlank(message = "UPI ID cannot be empty")
     @Schema(description = "Unique Virtual Payment Address / UPI ID", example = "john@upi")
     @JsonProperty("upiId")
+    @JsonAlias({"upi_id"})
     private String upiId;
 
     @NotBlank(message = "PIN cannot be empty")
@@ -34,6 +37,7 @@ public class UserCreateDto {
 
     @Schema(description = "Initial account balance upon registration", example = "50000.00")
     @JsonProperty("initialBalance")
+    @JsonAlias({"initial_balance"})
     private BigDecimal initialBalance;
 
     public UserCreateDto() {

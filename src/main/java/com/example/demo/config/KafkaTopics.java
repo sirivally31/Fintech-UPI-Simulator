@@ -31,4 +31,5 @@ public final class KafkaTopics {
     public static final String SETTLEMENT_FAILED = "upi.settlement.failed";
     public static final String SETTLEMENT_RECONCILED = "upi.settlement.reconciled";
     public static final String SETTLEMENT_REVERSED = "upi.settlement.reversed";
+    public static final String AUDIT_CREATED = "upi.audit.created";
 }

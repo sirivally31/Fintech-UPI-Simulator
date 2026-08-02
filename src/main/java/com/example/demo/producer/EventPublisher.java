@@ -49,4 +49,6 @@ public interface EventPublisher {
     void publishSettlementReconciled(SettlementReconciledEvent event);
 
     void publishSettlementReversed(SettlementReversedEvent event);
+
+    void publishAuditCreated(AuditCreatedEvent event);
 }

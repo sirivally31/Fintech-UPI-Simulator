@@ -109,7 +109,7 @@ class AdminDashboardServiceImplTest {
     void testUpdateUserStatus() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
-        User updated = adminDashboardService.updateUserStatus(1L, "disable");
+        UserDto updated = adminDashboardService.updateUserStatus(1L, "disable");
 
         assertNotNull(updated);
         assertEquals("John Doe", updated.getName());
@@ -122,7 +122,7 @@ class AdminDashboardServiceImplTest {
         when(merchantRepository.findAll()).thenReturn(List.of(merchant));
         when(merchantRepository.save(any(Merchant.class))).thenReturn(merchant);
 
-        Merchant updated = adminDashboardService.updateMerchantStatus(1L, "suspend");
+        MerchantResponse updated = adminDashboardService.updateMerchantStatus(1L, "suspend");
 
         assertNotNull(updated);
         assertFalse(updated.getActive());

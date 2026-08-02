@@ -22,8 +22,8 @@ public class User {
     @Column(nullable = false, unique = true, length = 50)
     private String upiId;
 
-    @Column(nullable = false, length = 6)
-    private String pin; // 4 or 6 digit UPI pin
+    @Column(nullable = false, length = 255)
+    private String pin; // 4 or 6 digit UPI pin (stored as BCrypt hash)
 
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;

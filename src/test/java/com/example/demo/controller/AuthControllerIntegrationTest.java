@@ -64,6 +64,38 @@ class AuthControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("Should register a new user successfully using snake_case JSON payload")
+    void shouldRegisterUserSuccessfullyWithSnakeCaseJson() throws Exception {
+        String jsonPayload = """
+                {
+                  "name": "Jane Snake",
+                  "phone_number": "9988776655",
+                  "upi_id": "jane@upi",
+                  "pin": "1234",
+                  "initial_balance": 2000.00
+                }
+                """;
+
+        mockMvc.perform(post("/api/users/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.upiId").value("jane@upi"))
+                .andExpect(jsonPath("$.phoneNumber").value("9988776655"));
+
+        assertTrue(userRepository.existsByUpiId("jane@upi"));
+    }
+
+    @Test
+    @DisplayName("Should return HTTP 200 OK for GET /v3/api-docs")
+    void shouldReturnOkForSwaggerApiDocs() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openapi", notNullValue()));
+    }
+
+    @Test
     @DisplayName("Should login successfully with valid credentials and return JWT token")
     void shouldLoginSuccessfullyAndReturnJwt() throws Exception {
         // Register user first

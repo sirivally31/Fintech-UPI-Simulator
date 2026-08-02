@@ -1,9 +1,6 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.*;
-import com.example.demo.entity.Merchant;
-import com.example.demo.entity.Transaction;
-import com.example.demo.entity.User;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,11 +21,11 @@ public interface AdminDashboardService {
 
     FraudAnalyticsResponse getFraudAnalytics();
 
-    List<Transaction> searchTransactions(String status, BigDecimal minAmount, String upiId, String reference);
+    List<TransactionResponse> searchTransactions(String status, BigDecimal minAmount, String upiId, String reference);
 
-    User updateUserStatus(Long userId, String action);
+    UserDto updateUserStatus(Long userId, String action);
 
-    Merchant updateMerchantStatus(Long merchantId, String action);
+    MerchantResponse updateMerchantStatus(Long merchantId, String action);
 
     void resendNotification(UUID notificationId);
 }

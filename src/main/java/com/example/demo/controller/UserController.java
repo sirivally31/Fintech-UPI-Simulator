@@ -32,13 +32,9 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Validation error or duplicate user")
     })
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody UserCreateDto request) {
-        try {
-            UserDto createdUser = userService.createUser(request);
-            return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<UserDto> registerUser(@Valid @RequestBody UserCreateDto request) {
+        UserDto createdUser = userService.createUser(request);
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
     @Operation(summary = "Get user by UPI ID", description = "Retrieves user details based on their primary UPI ID.")
@@ -47,13 +43,9 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     @GetMapping("/{upiId}")
-    public ResponseEntity<?> getUserByUpiId(@PathVariable String upiId) {
-        try {
-            UserDto user = userService.getUserByUpiId(upiId);
-            return ResponseEntity.ok(user);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<UserDto> getUserByUpiId(@PathVariable String upiId) {
+        UserDto user = userService.getUserByUpiId(upiId);
+        return ResponseEntity.ok(user);
     }
 
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users.")

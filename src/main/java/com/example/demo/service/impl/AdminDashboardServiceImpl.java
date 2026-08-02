@@ -186,29 +186,30 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Transaction> searchTransactions(String status, BigDecimal minAmount, String upiId, String reference) {
+    public List<TransactionResponse> searchTransactions(String status, BigDecimal minAmount, String upiId, String reference) {
         return transactionRepository.findAll().stream()
                 .filter(t -> status == null || t.getStatus().name().equalsIgnoreCase(status))
                 .filter(t -> minAmount == null || t.getAmount().compareTo(minAmount) >= 0)
                 .filter(t -> reference == null || t.getTransactionReference().equalsIgnoreCase(reference))
+                .map(this::mapToTransactionResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public User updateUserStatus(Long userId, String action) {
+    public UserDto updateUserStatus(Long userId, String action) {
         log.info("Admin action [{}] on User ID [{}]", action, userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
 
         redisCacheService.delete(CACHE_KEY_SUMMARY);
-        return user;
+        return mapToUserDto(user);
     }
 
     @Override
     @Transactional
-    public Merchant updateMerchantStatus(Long merchantId, String action) {
+    public MerchantResponse updateMerchantStatus(Long merchantId, String action) {
         log.info("Admin action [{}] on Merchant ID [{}]", action, merchantId);
 
         List<Merchant> merchants = merchantRepository.findAll();
@@ -227,7 +228,43 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         }
 
         redisCacheService.delete(CACHE_KEY_SUMMARY);
-        return merchant;
+        return mapToMerchantResponse(merchant);
+    }
+
+    private TransactionResponse mapToTransactionResponse(Transaction t) {
+        TransactionResponse dto = new TransactionResponse();
+        dto.setTransactionReference(t.getTransactionReference());
+        dto.setSenderUpiId(t.getSenderUpiId() != null ? t.getSenderUpiId().getUpiId() : null);
+        dto.setReceiverUpiId(t.getReceiverUpiId() != null ? t.getReceiverUpiId().getUpiId() : null);
+        dto.setAmount(t.getAmount());
+        dto.setRemarks(t.getRemarks());
+        dto.setStatus(t.getStatus());
+        dto.setCreatedAt(t.getCreatedAt());
+        return dto;
+    }
+
+    private UserDto mapToUserDto(User u) {
+        return new UserDto(
+                u.getId(),
+                u.getName(),
+                u.getPhoneNumber(),
+                u.getUpiId(),
+                u.getBalance()
+        );
+    }
+
+    private MerchantResponse mapToMerchantResponse(Merchant m) {
+        if (m == null) return null;
+        return new MerchantResponse(
+                m.getId(),
+                m.getMerchantName(),
+                m.getBusinessName(),
+                m.getMerchantCode(),
+                m.getUpiId(),
+                m.getCategory(),
+                m.getActive(),
+                m.getCreatedAt()
+        );
     }
 
     @Override
