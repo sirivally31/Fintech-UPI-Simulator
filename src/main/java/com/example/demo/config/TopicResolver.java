@@ -20,6 +20,7 @@ public class TopicResolver {
             case "PAYMENT_REQUEST_ACCEPTED", "PAYMENTREQUESTACCEPTED" -> KafkaTopics.PAYMENT_REQUEST_ACCEPTED;
             case "PAYMENT_REQUEST_REJECTED", "PAYMENTREQUESTREJECTED" -> KafkaTopics.PAYMENT_REQUEST_REJECTED;
             case "PAYMENT_REQUEST_CANCELLED", "PAYMENTREQUESTCANCELLED" -> KafkaTopics.PAYMENT_REQUEST_CANCELLED;
+            case "DASHBOARD_REFRESHED", "DASHBOARDREFRESHED" -> KafkaTopics.ANALYTICS_UPDATED;
             default -> throw new IllegalArgumentException("Unknown eventType for topic resolution: " + eventType);
         };
     }

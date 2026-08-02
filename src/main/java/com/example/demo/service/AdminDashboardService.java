@@ -21,6 +21,8 @@ public interface AdminDashboardService {
 
     FraudAnalyticsResponse getFraudAnalytics();
 
+    DashboardAnalyticsResponse getDashboardAnalytics();
+
     List<TransactionResponse> searchTransactions(String status, BigDecimal minAmount, String upiId, String reference);
 
     UserDto updateUserStatus(Long userId, String action);

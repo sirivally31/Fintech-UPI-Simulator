@@ -5,7 +5,9 @@ import com.example.demo.entity.*;
 import com.example.demo.exception.NotificationNotFoundException;
 import com.example.demo.exception.UserNotFoundException;
 import com.example.demo.repository.*;
+import com.example.demo.events.DashboardRefreshedEvent;
 import com.example.demo.service.AdminDashboardService;
+import com.example.demo.service.OutboxService;
 import com.example.demo.service.RedisCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +40,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final FraudRuleRepository fraudRuleRepository;
     private final NotificationRepository notificationRepository;
     private final RedisCacheService redisCacheService;
+    private final OutboxService outboxService;
 
     public AdminDashboardServiceImpl(UserRepository userRepository,
                                      BankAccountRepository bankAccountRepository,
@@ -46,7 +49,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                      AutoPayRepository autoPayRepository,
                                      FraudRuleRepository fraudRuleRepository,
                                      NotificationRepository notificationRepository,
-                                     RedisCacheService redisCacheService) {
+                                     RedisCacheService redisCacheService,
+                                     OutboxService outboxService) {
         this.userRepository = userRepository;
         this.bankAccountRepository = bankAccountRepository;
         this.merchantRepository = merchantRepository;
@@ -55,6 +59,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         this.fraudRuleRepository = fraudRuleRepository;
         this.notificationRepository = notificationRepository;
         this.redisCacheService = redisCacheService;
+        this.outboxService = outboxService;
     }
 
     @Override
@@ -182,6 +187,139 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long allowed = allTxns.stream().filter(t -> t.getStatus() == TransactionStatus.SUCCESS).count();
 
         return new FraudAnalyticsResponse(total, blocked, reviewed, allowed);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardAnalyticsResponse getDashboardAnalytics() {
+        String cacheKey = "admin:dashboard:analytics";
+        DashboardAnalyticsResponse cached = redisCacheService.find(cacheKey, DashboardAnalyticsResponse.class);
+        if (cached != null) {
+            return cached;
+        }
+
+        List<Transaction> allTxns = transactionRepository.findAll();
+        long totalTransactions = allTxns.size();
+
+        BigDecimal totalVolume = allTxns.stream()
+                .filter(t -> t.getAmount() != null)
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime oneWeekAgo = now.minusWeeks(1);
+
+        List<DashboardTrendPoint> trendSeries = allTxns.stream()
+                .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().isAfter(oneWeekAgo))
+                .collect(Collectors.groupingBy(t -> t.getCreatedAt().toLocalDate()))
+                .entrySet().stream()
+                .map(entry -> {
+                    long count = entry.getValue().size();
+                    BigDecimal volume = entry.getValue().stream()
+                            .filter(tx -> tx.getStatus() == TransactionStatus.SUCCESS)
+                            .map(Transaction::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    long successCount = entry.getValue().stream().filter(tx -> tx.getStatus() == TransactionStatus.SUCCESS).count();
+                    double successRate = count > 0 ? (double) successCount / count * 100.0 : 0.0;
+                    return new DashboardTrendPoint(entry.getKey().toString(), count, volume, Math.round(successRate * 10.0) / 10.0);
+                })
+                .sorted((a, b) -> a.getLabel().compareTo(b.getLabel()))
+                .collect(Collectors.toList());
+
+        List<TopEntitySummary> topMerchants = allTxns.stream()
+                .filter(t -> t.getReceiverUpiId() != null && t.getReceiverUpiId().getUpiId() != null)
+                .collect(Collectors.groupingBy(t -> t.getReceiverUpiId().getUpiId()))
+                .entrySet().stream()
+                .map(entry -> new TopEntitySummary(
+                        "MERCHANT",
+                        entry.getKey(),
+                        "UNKNOWN",
+                        entry.getValue().size(),
+                        entry.getValue().stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
+                ))
+                .sorted((a, b) -> b.getTransactionVolume().compareTo(a.getTransactionVolume()))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        List<TopEntitySummary> topUsers = allTxns.stream()
+                .filter(t -> t.getSenderUpiId() != null && t.getSenderUpiId().getUpiId() != null)
+                .collect(Collectors.groupingBy(t -> t.getSenderUpiId().getUpiId()))
+                .entrySet().stream()
+                .map(entry -> new TopEntitySummary(
+                        "USER",
+                        entry.getKey(),
+                        "UNKNOWN",
+                        entry.getValue().size(),
+                        entry.getValue().stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
+                ))
+                .sorted((a, b) -> b.getTransactionVolume().compareTo(a.getTransactionVolume()))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        List<TopEntitySummary> topCategories = allTxns.stream()
+                .filter(t -> t.getRemarks() != null)
+                .collect(Collectors.groupingBy(t -> extractCategory(t.getRemarks())))
+                .entrySet().stream()
+                .map(entry -> new TopEntitySummary(
+                        "CATEGORY",
+                        entry.getKey(),
+                        entry.getKey(),
+                        entry.getValue().size(),
+                        entry.getValue().stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
+                ))
+                .sorted((a, b) -> b.getTransactionVolume().compareTo(a.getTransactionVolume()))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        DashboardAnalyticsResponse analytics = new DashboardAnalyticsResponse(
+                totalTransactions,
+                totalVolume,
+                trendSeries,
+                topMerchants,
+                topUsers,
+                topCategories
+        );
+
+        redisCacheService.save(cacheKey, analytics, 5, TimeUnit.MINUTES);
+
+        try {
+            DashboardRefreshedEvent event = DashboardRefreshedEvent.fromAnalyticsResponse(analytics);
+            outboxService.saveOutboxEvent(
+                    UUID.fromString(event.getEventId()),
+                    "DASHBOARD_ANALYTICS",
+                    Math.abs((long) event.getEventId().hashCode()),
+                    "DASHBOARD_REFRESHED",
+                    event.getCorrelationId(),
+                    event
+            );
+        } catch (IllegalArgumentException e) {
+            log.warn("Failed to save dashboard analytics outbox event", e);
+        }
+
+        return analytics;
+    }
+
+    private String extractCategory(String remarks) {
+        if (remarks == null || remarks.isBlank()) {
+            return "UNCATEGORIZED";
+        }
+        String normalized = remarks.toLowerCase();
+        if (normalized.contains("grocery")) {
+            return "Grocery";
+        }
+        if (normalized.contains("utility")) {
+            return "Utilities";
+        }
+        if (normalized.contains("fuel")) {
+            return "Fuel";
+        }
+        if (normalized.contains("rent")) {
+            return "Rent";
+        }
+        if (normalized.contains("shopping")) {
+            return "Shopping";
+        }
+        return "Other";
     }
 
     @Override

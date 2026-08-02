@@ -91,6 +91,15 @@ public class AdminDashboardController {
         return ResponseEntity.ok(analytics);
     }
 
+    @Operation(summary = "Get Dashboard Analytics", description = "Retrieves advanced analytics, trends, and top performing entities for the admin dashboard.")
+    @ApiResponse(responseCode = "200", description = "Dashboard analytics retrieved successfully",
+            content = @Content(schema = @Schema(implementation = DashboardAnalyticsResponse.class)))
+    @GetMapping("/analytics/dashboard")
+    public ResponseEntity<DashboardAnalyticsResponse> getDashboardAnalytics() {
+        DashboardAnalyticsResponse analytics = adminDashboardService.getDashboardAnalytics();
+        return ResponseEntity.ok(analytics);
+    }
+
     @Operation(summary = "Get All System Transactions", description = "Retrieves complete transaction log history for operations audit.")
     @ApiResponse(responseCode = "200", description = "Transactions retrieved successfully")
     @GetMapping("/transactions")

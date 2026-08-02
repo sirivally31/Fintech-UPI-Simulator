@@ -6,6 +6,7 @@ import com.example.demo.entity.Notification;
 import com.example.demo.entity.NotificationStatus;
 import com.example.demo.entity.User;
 import com.example.demo.repository.*;
+import com.example.demo.service.OutboxService;
 import com.example.demo.service.RedisCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +53,9 @@ class AdminDashboardServiceImplTest {
 
     @Mock
     private RedisCacheService redisCacheService;
+
+    @Mock
+    private OutboxService outboxService;
 
     @InjectMocks
     private AdminDashboardServiceImpl adminDashboardService;
@@ -91,6 +97,25 @@ class AdminDashboardServiceImplTest {
         assertEquals(5L, summary.getTotalMerchants());
 
         verify(redisCacheService).save(eq("admin:dashboard:summary"), any(DashboardSummaryResponse.class), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Get Dashboard Analytics - Cache Miss and Calculate Trends")
+    void testGetDashboardAnalytics_CacheMiss() {
+        when(redisCacheService.find("admin:dashboard:analytics", DashboardAnalyticsResponse.class)).thenReturn(null);
+        when(transactionRepository.findAll()).thenReturn(Collections.emptyList());
+
+        DashboardAnalyticsResponse analytics = adminDashboardService.getDashboardAnalytics();
+
+        assertNotNull(analytics);
+        assertEquals(0L, analytics.getTotalTransactions());
+        assertEquals(0, analytics.getTrendSeries().size());
+        assertEquals(0, analytics.getTopMerchants().size());
+        assertEquals(0, analytics.getTopUsers().size());
+        assertEquals(0, analytics.getTopCategories().size());
+
+        verify(redisCacheService).save(eq("admin:dashboard:analytics"), any(DashboardAnalyticsResponse.class), anyLong(), any());
+        verify(outboxService).saveOutboxEvent(any(), eq("DASHBOARD_ANALYTICS"), anyLong(), eq("DASHBOARD_REFRESHED"), anyString(), any());
     }
 
     @Test
