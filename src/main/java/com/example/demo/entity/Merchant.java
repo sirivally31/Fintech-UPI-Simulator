@@ -33,6 +33,12 @@ public class Merchant {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(nullable = false)
+    private Boolean approved = false;
+
+    @Column(nullable = false)
+    private Boolean suspended = false;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -58,6 +64,12 @@ public class Merchant {
         }
         if (this.active == null) {
             this.active = true;
+        }
+        if (this.approved == null) {
+            this.approved = false;
+        }
+        if (this.suspended == null) {
+            this.suspended = false;
         }
     }
 
@@ -123,5 +135,21 @@ public class Merchant {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getApproved() {
+        return approved;
+    }
+
+    public void setApproved(Boolean approved) {
+        this.approved = approved;
+    }
+
+    public Boolean getSuspended() {
+        return suspended;
+    }
+
+    public void setSuspended(Boolean suspended) {
+        this.suspended = suspended;
     }
 }

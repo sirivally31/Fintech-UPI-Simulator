@@ -124,7 +124,7 @@ public class AdminDashboardController {
 
     @Operation(summary = "Get All Users", description = "Retrieves all registered users.")
     @ApiResponse(responseCode = "200", description = "Users retrieved successfully")
-    @GetMapping("/users")
+    @GetMapping("/dashboard/users")
     public ResponseEntity<List<UserDto>> getAllUsers() {
         List<UserDto> users = userRepository.findAll().stream()
                 .map(this::mapToUserDto)
@@ -134,7 +134,7 @@ public class AdminDashboardController {
 
     @Operation(summary = "Update User Status", description = "Admin action to disable, enable, lock, or unlock a user profile.")
     @ApiResponse(responseCode = "200", description = "User status updated successfully")
-    @PatchMapping("/users/{id}/status")
+    @PatchMapping("/dashboard/users/{id}/status")
     public ResponseEntity<UserDto> updateUserStatus(
             @Parameter(description = "User ID", required = true) @PathVariable Long id,
             @RequestParam String action) {
@@ -144,7 +144,7 @@ public class AdminDashboardController {
 
     @Operation(summary = "Get All Merchants", description = "Retrieves all registered merchant profiles.")
     @ApiResponse(responseCode = "200", description = "Merchants retrieved successfully")
-    @GetMapping("/merchants")
+    @GetMapping("/dashboard/merchants")
     public ResponseEntity<List<MerchantResponse>> getAllMerchants() {
         List<MerchantResponse> merchants = merchantRepository.findAll().stream()
                 .map(this::mapToMerchantResponse)
@@ -154,7 +154,7 @@ public class AdminDashboardController {
 
     @Operation(summary = "Update Merchant Status", description = "Admin action to approve, reject, suspend, or reactivate a merchant.")
     @ApiResponse(responseCode = "200", description = "Merchant status updated successfully")
-    @PatchMapping("/merchants/{id}/status")
+    @PatchMapping("/dashboard/merchants/{id}/status")
     public ResponseEntity<MerchantResponse> updateMerchantStatus(
             @Parameter(description = "Merchant ID", required = true) @PathVariable Long id,
             @RequestParam String action) {

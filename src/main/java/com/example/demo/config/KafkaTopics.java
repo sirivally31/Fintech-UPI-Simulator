@@ -33,4 +33,16 @@ public final class KafkaTopics {
     public static final String SETTLEMENT_REVERSED = "upi.settlement.reversed";
     public static final String AUDIT_CREATED = "upi.audit.created";
     public static final String ANALYTICS_UPDATED = "upi.analytics.updated";
+    
+    // Admin Module Topics
+    public static final String ADMIN_ACTION_EVENT = "upi.admin.action";
+    public static final String ROLE_ASSIGNED = "upi.admin.role.assigned";
+    public static final String SYSTEM_CONFIG_UPDATED = "upi.admin.config.updated";
+    public static final String MERCHANT_APPROVED = "upi.admin.merchant.approved";
+    public static final String MERCHANT_BLOCKED = "upi.admin.merchant.blocked";
+
+    // Module 19: Reports
+    public static final String REPORT_GENERATED = "upi.report.generated";
+    public static final String REPORT_DOWNLOADED = "upi.report.downloaded";
+    public static final String SCHEDULED_REPORT_GENERATED = "upi.report.scheduled.generated";
 }

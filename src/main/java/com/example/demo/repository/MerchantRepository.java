@@ -4,6 +4,8 @@ import com.example.demo.entity.Merchant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +22,14 @@ public interface MerchantRepository extends JpaRepository<Merchant, UUID> {
     boolean existsByMerchantCode(String merchantCode);
 
     boolean existsByUpiId(String upiId);
+
+    Page<Merchant> findByMerchantNameContainingIgnoreCase(String name, Pageable pageable);
+
+    long countByActiveTrue();
+
+    long countByActiveFalse();
+
+    long countBySuspendedTrue();
+
+    long countByApprovedTrue();
 }

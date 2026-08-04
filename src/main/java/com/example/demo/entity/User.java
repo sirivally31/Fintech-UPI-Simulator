@@ -3,7 +3,9 @@ package com.example.demo.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -27,6 +29,20 @@ public class User {
 
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private Boolean enabled = true;
+
+    @Column(nullable = false)
+    private Boolean locked = false;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
 
     // @OneToMany specifies a one-to-many relationship with the BankAccount entity.
     // mappedBy indicates that the 'user' field in the BankAccount entity owns the relationship.
@@ -100,5 +116,29 @@ public class User {
 
     public void setBankAccounts(List<BankAccount> bankAccounts) {
         this.bankAccounts = bankAccounts;
+    }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public Boolean getLocked() {
+        return locked;
+    }
+
+    public void setLocked(Boolean locked) {
+        this.locked = locked;
+    }
+
+    public Set<Role> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles;
     }
 }

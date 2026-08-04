@@ -140,6 +140,47 @@ public class KafkaEventPublisher implements EventPublisher {
         sendEvent(KafkaTopics.AUDIT_CREATED, event.getEventId(), event.getCorrelationId(), event);
     }
 
+    @Override
+    public void publishAdminAction(AdminActionEvent event) {
+        sendEvent(KafkaTopics.ADMIN_ACTION_EVENT, event.getAdminUsername(), null, event);
+    }
+
+    @Override
+    public void publishRoleAssigned(RoleAssignedEvent event) {
+        sendEvent(KafkaTopics.ROLE_ASSIGNED, event.getTargetUsername(), null, event);
+    }
+
+    @Override
+    public void publishSystemConfigUpdated(SystemConfigUpdatedEvent event) {
+        sendEvent(KafkaTopics.SYSTEM_CONFIG_UPDATED, event.getConfigKey(), null, event);
+    }
+
+    @Override
+    public void publishMerchantApproved(MerchantApprovedEvent event) {
+        sendEvent(KafkaTopics.MERCHANT_APPROVED, event.getMerchantCode(), null, event);
+    }
+
+    @Override
+    public void publishMerchantBlocked(MerchantBlockedEvent event) {
+        sendEvent(KafkaTopics.MERCHANT_BLOCKED, event.getMerchantCode(), null, event);
+    }
+
+    // Module 19: Reports
+    @Override
+    public void publishReportGenerated(com.example.demo.events.ReportGeneratedEvent event) {
+        sendEvent(KafkaTopics.REPORT_GENERATED, event.getReportId().toString(), event.getCorrelationId(), event);
+    }
+
+    @Override
+    public void publishReportDownloaded(com.example.demo.events.ReportDownloadedEvent event) {
+        sendEvent(KafkaTopics.REPORT_DOWNLOADED, event.getReportId().toString(), event.getCorrelationId(), event);
+    }
+
+    @Override
+    public void publishScheduledReportGenerated(com.example.demo.events.ScheduledReportGeneratedEvent event) {
+        sendEvent(KafkaTopics.SCHEDULED_REPORT_GENERATED, event.getReportId().toString(), event.getCorrelationId(), event);
+    }
+
     /**
      * Private helper method to handle event publishing, asynchronous callbacks, and structured logging.
      *

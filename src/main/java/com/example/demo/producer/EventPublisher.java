@@ -51,4 +51,19 @@ public interface EventPublisher {
     void publishSettlementReversed(SettlementReversedEvent event);
 
     void publishAuditCreated(AuditCreatedEvent event);
+
+    void publishAdminAction(AdminActionEvent event);
+
+    void publishRoleAssigned(RoleAssignedEvent event);
+
+    void publishSystemConfigUpdated(SystemConfigUpdatedEvent event);
+
+    void publishMerchantApproved(MerchantApprovedEvent event);
+
+    void publishMerchantBlocked(MerchantBlockedEvent event);
+
+    // Module 19: Reports
+    void publishReportGenerated(com.example.demo.events.ReportGeneratedEvent event);
+    void publishReportDownloaded(com.example.demo.events.ReportDownloadedEvent event);
+    void publishScheduledReportGenerated(com.example.demo.events.ScheduledReportGeneratedEvent event);
 }
